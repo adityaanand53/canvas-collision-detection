@@ -104,74 +104,124 @@ function _defineProperties(target, props) { for (var i = 0; i < props.length; i+
 function _createClass(Constructor, protoProps, staticProps) { if (protoProps) _defineProperties(Constructor.prototype, protoProps); if (staticProps) _defineProperties(Constructor, staticProps); return Constructor; }
 
 
-var canvas = document.querySelector('canvas');
-var c = canvas.getContext('2d');
+var canvas = document.querySelector("canvas");
+var c = canvas.getContext("2d");
 canvas.width = innerWidth;
 canvas.height = innerHeight;
 var mouse = {
   x: innerWidth / 2,
   y: innerHeight / 2
 };
-var colors = ['#2185C5', '#7ECEFD', '#FFF6E5', '#FF7F66']; // Event Listeners
-
-addEventListener('mousemove', function (event) {
+var colors = ["#2185C5", "#7ECEFD", "red", "#FF7F66"];
+addEventListener("mousemove", function (event) {
   mouse.x = event.clientX;
   mouse.y = event.clientY;
 });
-addEventListener('resize', function () {
+addEventListener("resize", function () {
   canvas.width = innerWidth;
   canvas.height = innerHeight;
   init();
-}); // Objects
+});
 
-var _Object =
+var Particle =
 /*#__PURE__*/
 function () {
-  function Object(x, y, radius, color) {
-    _classCallCheck(this, Object);
+  function Particle(x, y, mass, opacity, radius, color) {
+    _classCallCheck(this, Particle);
 
     this.x = x;
     this.y = y;
     this.radius = radius;
     this.color = color;
+    this.mass = mass;
+    this.opacity = opacity;
+    this.velocity = {
+      x: _utils__WEBPACK_IMPORTED_MODULE_0___default.a.randomIntFromRange(-2.5, 2.5),
+      y: _utils__WEBPACK_IMPORTED_MODULE_0___default.a.randomIntFromRange(-2.5, 2.5)
+    };
   }
 
-  _createClass(Object, [{
+  _createClass(Particle, [{
     key: "draw",
     value: function draw() {
       c.beginPath();
       c.arc(this.x, this.y, this.radius, 0, Math.PI * 2, false);
+      c.save();
+      c.globalAlpha = this.opacity;
       c.fillStyle = this.color;
       c.fill();
+      c.restore();
+      c.strokeStyle = this.color;
+      c.stroke();
       c.closePath();
     }
   }, {
     key: "update",
     value: function update() {
+      for (var i = 0; i < particles.length; i++) {
+        if (this !== particles[i]) {
+          if (_utils__WEBPACK_IMPORTED_MODULE_0___default.a.distance(this.x, this.y, particles[i].x, particles[i].y) - 2 * this.radius <= 0) {
+            _utils__WEBPACK_IMPORTED_MODULE_0___default.a.resolveCollision(this, particles[i]);
+          }
+        }
+      }
+
+      if (this.x - this.radius <= 0 || this.x + this.radius >= innerWidth) {
+        this.velocity.x = -this.velocity.x;
+      }
+
+      if (this.y - this.radius <= 0 || this.y + this.radius >= innerHeight) {
+        this.velocity.y = -this.velocity.y;
+      }
+
+      if (_utils__WEBPACK_IMPORTED_MODULE_0___default.a.distance(mouse.x, mouse.y, this.x, this.y) <= 100 && this.opacity < 0.2) {
+        this.opacity += 0.02;
+      } else if (this.opacity > 0) {
+        this.opacity -= 0.02;
+        this.opacity = Math.max(0, this.opacity);
+      }
+
+      this.x += this.velocity.x;
+      this.y += this.velocity.y;
       this.draw();
     }
   }]);
 
-  return Object;
-}(); // Implementation
+  return Particle;
+}();
 
-
-var objects;
+var particles;
 
 function init() {
-  objects = [];
+  particles = [];
 
-  for (var i = 0; i < 400; i++) {// objects.push()
+  for (var i = 0; i < 100; i++) {
+    var radius = 20;
+    var mass = 1;
+    var x = _utils__WEBPACK_IMPORTED_MODULE_0___default.a.randomIntFromRange(radius, innerWidth - radius);
+    var y = _utils__WEBPACK_IMPORTED_MODULE_0___default.a.randomIntFromRange(radius, innerHeight - radius);
+    var color = _utils__WEBPACK_IMPORTED_MODULE_0___default.a.randomColor(colors);
+
+    if (i !== 0) {
+      for (var j = 0; j < particles.length; j++) {
+        if (_utils__WEBPACK_IMPORTED_MODULE_0___default.a.distance(x, y, particles[j].x, particles[j].y) - 2 * radius <= 0) {
+          x = _utils__WEBPACK_IMPORTED_MODULE_0___default.a.randomIntFromRange(radius, innerWidth - radius);
+          y = _utils__WEBPACK_IMPORTED_MODULE_0___default.a.randomIntFromRange(radius, innerHeight - radius);
+          j = -1;
+        }
+      }
+    }
+
+    particles.push(new Particle(x, y, mass, 0, radius, color));
   }
-} // Animation Loop
-
+}
 
 function animate() {
   requestAnimationFrame(animate);
   c.clearRect(0, 0, canvas.width, canvas.height);
-  c.fillText('HTML CANVAS BOILERPLATE', mouse.x, mouse.y); // objects.forEach(object => {
-  //  object.update()
-  // })
+  particles.forEach(function (particle) {
+    particle.update();
+  });
 }
 
 init();
@@ -200,10 +250,54 @@ function distance(x1, y1, x2, y2) {
   return Math.sqrt(Math.pow(xDist, 2) + Math.pow(yDist, 2));
 }
 
+function rotate(velocity, angle) {
+  var rotatedVelocities = {
+    x: velocity.x * Math.cos(angle) - velocity.y * Math.sin(angle),
+    y: velocity.x * Math.sin(angle) + velocity.y * Math.cos(angle)
+  };
+  return rotatedVelocities;
+}
+
+function resolveCollision(particle, otherParticle) {
+  var xVelocityDiff = particle.velocity.x - otherParticle.velocity.x;
+  var yVelocityDiff = particle.velocity.y - otherParticle.velocity.y;
+  var xDist = otherParticle.x - particle.x;
+  var yDist = otherParticle.y - particle.y; // Prevent accidental overlap of particles
+
+  if (xVelocityDiff * xDist + yVelocityDiff * yDist >= 0) {
+    // Grab angle between the two colliding particles
+    var angle = -Math.atan2(otherParticle.y - particle.y, otherParticle.x - particle.x); // Store mass in var for better readability in collision equation
+
+    var m1 = particle.mass;
+    var m2 = otherParticle.mass; // Velocity before equation
+
+    var u1 = rotate(particle.velocity, angle);
+    var u2 = rotate(otherParticle.velocity, angle); // Velocity after 1d collision equation
+
+    var v1 = {
+      x: u1.x * (m1 - m2) / (m1 + m2) + u2.x * 2 * m2 / (m1 + m2),
+      y: u1.y
+    };
+    var v2 = {
+      x: u2.x * (m1 - m2) / (m1 + m2) + u1.x * 2 * m2 / (m1 + m2),
+      y: u2.y
+    }; // Final velocity after rotating axis back to original location
+
+    var vFinal1 = rotate(v1, -angle);
+    var vFinal2 = rotate(v2, -angle); // Swap particle velocities for realistic bounce effect
+
+    particle.velocity.x = vFinal1.x;
+    particle.velocity.y = vFinal1.y;
+    otherParticle.velocity.x = vFinal2.x;
+    otherParticle.velocity.y = vFinal2.y;
+  }
+}
+
 module.exports = {
   randomIntFromRange: randomIntFromRange,
   randomColor: randomColor,
-  distance: distance
+  distance: distance,
+  resolveCollision: resolveCollision
 };
 
 /***/ })
